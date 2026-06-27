@@ -15,9 +15,9 @@
             <span class="text-5xl block mb-4">🎬</span>
             <h1 class="text-2xl font-bold mb-2 tracking-tight text-zinc-100">Connect Production Pipeline</h1>
             <p class="text-sm text-zinc-400 mb-6">Authorize secure access to your Google Workspace directory to instantiate live cloud sheets that sync across your entire crew's devices on set.</p>
-            <button onclick="handleAuthClick()" class="bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold px-6 py-3 rounded-lg text-sm tracking-wide shadow-lg transition-colors inline-flex items-center gap-2">
-                Sign In with Google Identity
-            </button>
+            <button onclick="handleAuthClick(); document.getElementById('auth-overlay').classList.add('hidden');" class="bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold px-6 py-3 rounded-lg text-sm tracking-wide shadow-lg transition-colors inline-flex items-center gap-2">
+    Sign In with Google Identity
+</button>
         </div>
     </div>
 
