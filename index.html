@@ -159,28 +159,40 @@
             if (gapiInited && gisInited) {
                 const savedToken = localStorage.getItem('g_auth_token');
                 if (savedToken) {
-                    gapi.client.setToken(JSON.parse(savedToken));
-                    // Ensure the overlay clears on standard page reload
-                    document.getElementById('auth-overlay').classList.add('opacity-0', 'pointer-events-none');
-                    loadHistoricalSheetsDirectory();
+                    try {
+                        gapi.client.setToken(JSON.parse(savedToken));
+                        // Force the overlay away immediately if already authenticated
+                        document.getElementById('auth-overlay').classList.add('hidden');
+                        loadHistoricalSheetsDirectory();
+                    } catch (e) {
+                        console.error("Token restoration failed, clearing cache:", e);
+                        localStorage.removeItem('g_auth_token');
+                    }
                 }
             }
         }
 
-       function handleAuthClick() {
+        function handleAuthClick() {
             tokenClient.callback = async (resp) => {
-                if (resp.error !== undefined) throw (resp);
+                if (resp.error !== undefined) {
+                    console.error("Google Auth Error:", resp.error);
+                    throw (resp);
+                }
                 
-                // Explicitly store the active session state token
-                localStorage.setItem('g_auth_token', JSON.stringify(gapi.client.getToken()));
+                // CRUCIAL FIX: Pass the fresh token directly to GAPI before doing anything else
+                gapi.client.setToken(resp);
                 
-                // FIX: Instantly hide the dark blocking modal layer and reveal the dashboard workspace
-                document.getElementById('auth-overlay').classList.add('opacity-0', 'pointer-events-none');
+                // Store it safely for page refreshes
+                localStorage.setItem('g_auth_token', JSON.stringify(resp));
                 
-                // Immediately update directory arrays to show past sheets
+                // BULLETPROOF FIX: Use 'hidden' to physically drop the overlay element completely
+                document.getElementById('auth-overlay').classList.add('hidden');
+                
+                // Load your project directory mapping
                 await loadHistoricalSheetsDirectory();
             };
 
+            // Trigger the Google popup window frame
             if (gapi.client.getToken() === null) {
                 tokenClient.requestAccessToken({prompt: 'consent'});
             } else {
