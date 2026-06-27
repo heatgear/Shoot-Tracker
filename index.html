@@ -109,16 +109,12 @@
         </div>
     </div>
 
+    <!-- SCRIPT APPLICATION CONFIGURATION AND LOGIC -->
     <script>
-        /* PASTE YOUR SECURE GOOGLE DEVELOPER CREDS IN THESE HOOK SPACES BEFORE COMMITTING TO GITHUB.
-           You generate these on the console.cloud.google.com manager platform dashboard.
-        */
-        const CLIENT_ID = '252576845660-2emekh649a4bnc30n24gveos7pmgvqj6.apps.googleusercontent.com ';
-        const API_KEY = 'AIzaSyAyxyZiktcH4KHlAPmE1ksL_DOgZpr-Yu4';
+        const CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
+        const API_KEY = 'YOUR_GOOGLE_API_KEY';
         
-        // Target scope properties mapping to execute directory writing and storage functions
         const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets';
-        // FIX: Changed 'spreadsheets' to 'sheets' to fix the 404 API error
         const DISCOVERY_DOCS = [
             'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest',
             'https://www.googleapis.com/discovery/v1/apis/sheets/v4/rest'
@@ -135,13 +131,12 @@
             activeShotsData: []
         };
 
-        // Bootstrap loader configurations
         window.onload = function() {
             gapi.load('client', initializeGapiClient);
             tokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: CLIENT_ID,
                 scope: SCOPES,
-                callback: '', 
+                callback: '', // assigned dynamically
             });
             gisInited = true;
             checkAuthGates();
@@ -162,10 +157,12 @@
 
         function checkAuthGates() {
             if (gapiInited && gisInited) {
-                const savedToken = localStorage.getItem('g_auth_token');
-                if (savedToken) {
+                const savedTokenStr = localStorage.getItem('g_auth_token');
+                if (savedTokenStr) {
                     try {
-                        gapi.client.setToken(JSON.parse(savedToken));
+                        const tokenObj = JSON.parse(savedTokenStr);
+                        // Make sure we pass a structured token wrapper object
+                        gapi.client.setToken({ access_token: tokenObj.access_token || tokenObj });
                         document.getElementById('auth-overlay').classList.add('hidden');
                         loadHistoricalSheetsDirectory().catch(err => console.warn(err));
                     } catch (e) {
@@ -182,20 +179,16 @@
                     throw (resp);
                 }
                 
-                // 1. Pass the fresh token directly to GAPI
-                gapi.client.setToken(resp);
-                
-                // 2. Store it safely for page refreshes
+                // FIXED: Explicit structural binding for Google's API engine
+                gapi.client.setToken({ access_token: resp.access_token });
                 localStorage.setItem('g_auth_token', JSON.stringify(resp));
                 
-                // FIX: Drop the overlay IMMEDIATELY so the screen is never stuck
                 document.getElementById('auth-overlay').classList.add('hidden');
                 
-                // 3. Try to load past sheets, but don't let a Google API delay freeze the app
                 try {
                     await loadHistoricalSheetsDirectory();
                 } catch (directoryError) {
-                    console.warn("Drive API is still warming up on Google's servers:", directoryError);
+                    console.warn("Drive directory retrieval deferred:", directoryError);
                 }
             };
 
@@ -212,11 +205,10 @@
                 google.accounts.oauth2.revoke(token.access_token);
                 gapi.client.setToken(null);
                 localStorage.removeItem('g_auth_token');
-                document.getElementById('auth-overlay').classList.remove('opacity-0', 'pointer-events-none');
+                document.getElementById('auth-overlay').classList.remove('hidden');
             }
         }
 
-        // FETCH DIRECTORY LOGICAL WORKFLOW HOOKS
         async function loadHistoricalSheetsDirectory() {
             try {
                 const response = await gapi.client.drive.files.list({
@@ -228,6 +220,11 @@
                 renderSidebarMenu();
             } catch (err) {
                 console.error("Directory context extraction pipeline breakdown: ", err);
+                // Clear an expired token if it throws a 401 here
+                if (err.status === 401) {
+                    localStorage.removeItem('g_auth_token');
+                    document.getElementById('auth-overlay').classList.remove('hidden');
+                }
             }
         }
 
@@ -249,14 +246,12 @@
             });
         }
 
-        // CREATE NEW SHEET INTERFACE ENGINE
         async function createNewCloudSheet() {
             const inputField = document.getElementById('new-sheet-input');
             const titleText = inputField.value.trim();
             if (!titleText) return;
 
             try {
-                // Initialize clean spreadsheet configuration via sheet service engine
                 const spreadsheetProperties = {
                     properties: { title: titleText },
                     sheets: [{ properties: { title: 'Shotlist', gridProperties: { rowCount: 100, columnCount: 3 } } }]
@@ -265,7 +260,6 @@
                 const response = await gapi.client.sheets.spreadsheets.create({}, spreadsheetProperties);
                 const newSpreadsheetId = response.result.spreadsheetId;
 
-                // Append foundational framework header matrix layout schema to index 1 row arrays
                 const headers = [['Status', 'Shot Description', 'Location Setup Profile']];
                 await gapi.client.sheets.spreadsheets.values.update({
                     spreadsheetId: newSpreadsheetId,
@@ -278,18 +272,18 @@
                 await loadHistoricalSheetsDirectory();
                 selectActiveSheet(newSpreadsheetId, titleText);
             } catch (err) {
-                console.error("Critical spreadsheet deployment runtime exception: ", err);
+                console.error("Critical spreadsheet deployment exception: ", err);
+                alert(`Google rejected file generation. Verify Drive/Sheets API are enabled. details: ${err.result?.error?.message || err.message}`);
             }
         }
 
         async function selectActiveSheet(spreadsheetId, title) {
             appState.activeSpreadsheetId = spreadsheetId;
             appState.activeSheetTitle = title;
-            renderSidebarMenu(); // Refresh highlight active item position
+            renderSidebarMenu();
             await syncShotlistRowsFromCloud();
         }
 
-        // ROW EXTRAPOLATION AND CHECKBOX TOGGLE WORKFLOW ENGINES
         async function syncShotlistRowsFromCloud() {
             if (!appState.activeSpreadsheetId) return;
             
@@ -301,7 +295,7 @@
 
                 const rawRows = response.result.values || [];
                 appState.activeShotsData = rawRows.map((row, index) => ({
-                    rowIndex: index + 2, // Excel configuration references index offset balance mapping from line 2
+                    rowIndex: index + 2, 
                     isCompleted: row[0] === 'DONE',
                     description: row[1] || '',
                     location: row[2] || ''
