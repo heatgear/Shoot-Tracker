@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Production Shotlist Matrix Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://apis.google.com/js/api.js" async defer></script>
+</head>
+<body class="bg-zinc-950 text-zinc-100 font-sans min-h-screen flex flex-col md:flex-row">
+
+    <div id="auth-overlay" class="fixed inset-0 bg-zinc-950/95 z-50 flex flex-col items-center justify-center p-6 transition-opacity">
+        <div class="max-w-md text-center">
+            <span class="text-5xl block mb-4">🎬</span>
+            <h1 class="text-2xl font-bold mb-2 tracking-tight text-zinc-100">Connect Production Pipeline</h1>
+            <p class="text-sm text-zinc-400 mb-6">Authorize secure access to your Google Workspace directory to instantiate live cloud sheets that sync across your entire crew's devices on set.</p>
+            <button onclick="handleAuthClick()" class="bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold px-6 py-3 rounded-lg text-sm tracking-wide shadow-lg transition-colors inline-flex items-center gap-2">
+                Sign In with Google Identity
+            </button>
+        </div>
+    </div>
+
+    <div class="w-full md:w-72 bg-zinc-900 border-r border-zinc-800 p-4 flex flex-col shrink-0">
+        <h2 class="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-4">Production Board Directory</h2>
+        
+        <div class="space-y-2 mb-6">
+            <input 
+                type="text" 
+                id="new-sheet-input" 
+                placeholder="Enter Reel Title (e.g., Reel #14)" 
+                class="w-full bg-zinc-950 border border-zinc-800 text-sm rounded px-3 py-2 text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+            />
+            <button 
+                onclick="createNewCloudSheet()" 
+                class="w-full bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold rounded text-xs py-2 uppercase tracking-wider transition-colors block text-center"
+            >
+                ➕ Create New Sheet
+            </button>
+        </div>
+
+        <div class="border-t border-zinc-800/80 pt-4 flex-1 flex flex-col min-h-0">
+            <span class="text-[10px] font-bold text-zinc-600 uppercase tracking-widest block mb-2">Previous Sheets Log</span>
+            <div id="sheets-list" class="flex-1 overflow-y-auto space-y-1 max-h-[180px] md:max-h-none pr-1">
+                <div class="text-xs text-zinc-600 italic p-2">Loading directory profile...</div>
+            </div>
+        </div>
+
+        <div class="border-t border-zinc-800 pt-3 mt-4 flex items-center justify-between text-xs text-zinc-500">
+            <span id="user-display" class="truncate max-w-[150px]">Connected</span>
+            <button onclick="handleSignoutClick()" class="hover:text-red-400 font-semibold">Disconnect</button>
+        </div>
+    </div>
+
+    <div class="flex-1 p-6 md:p-10 overflow-y-auto">
+        <div id="active-sheet-container" class="max-w-4xl mx-auto hidden">
+            
+            <div class="flex justify-between items-center mb-6 border-b border-zinc-800 pb-4">
+                <div>
+                    <h1 id="active-sheet-title" class="text-2xl font-bold tracking-tight text-zinc-100">Active Board</h1>
+                    <a id="open-gspreadsheet" href="#" target="_blank" class="text-xs text-amber-500 hover:underline mt-1 inline-block font-mono">↗ View raw Google Spreadsheet data</a>
+                </div>
+                <span id="sheet-counter" class="text-xs font-mono bg-zinc-900 border border-zinc-800 px-3 py-1 rounded-full text-zinc-400">
+                    0 / 0 SHOTS DONE
+                </span>
+            </div>
+
+            <div class="bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden mb-6">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="border-b border-zinc-800 bg-zinc-900/50 text-zinc-500 text-xs font-bold uppercase tracking-wider">
+                            <th class="py-3 px-4 w-16 text-center">Done</th>
+                            <th class="py-3 px-4">Shot Description</th>
+                            <th class="py-3 px-4">Location / Setup Space</th>
+                        </tr>
+                    </thead>
+                    <tbody id="shots-tbody" class="divide-y divide-zinc-800/60">
+                        </tbody>
+                </table>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-zinc-900 p-4 rounded-lg border border-zinc-800">
+                <input 
+                    type="text" 
+                    id="new-shot-desc" 
+                    placeholder="Shot description (e.g., Ultra-wide pan)" 
+                    class="bg-zinc-950 border border-zinc-800 text-sm rounded px-3 py-2 text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+                />
+                <input 
+                    type="text" 
+                    id="new-shot-loc" 
+                    placeholder="Location / Camera Profile setup" 
+                    class="bg-zinc-950 border border-zinc-800 text-sm rounded px-3 py-2 text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-amber-500"
+                />
+                <button 
+                    onclick="addShotRow()" 
+                    class="bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-bold rounded text-sm py-2 px-4 transition-colors"
+                >
+                    + Add Row
+                </button>
+            </div>
+
+        </div>
+
+        <div id="empty-state" class="h-full flex flex-col items-center justify-center text-center p-6 mt-20 md:mt-36">
+            <span class="text-4xl mb-3">📋</span>
+            <h3 class="text-lg font-medium text-zinc-400">Production Interface Cleared</h3>
+            <p class="text-sm text-zinc-600 max-w-xs mt-1">Select an historical matrix tab layout via the sidebar directory or input a custom string identifier up top to initialize a clean tracking checklist sheet.</p>
+        </div>
+    </div>
+
+    <script>
+        /* PASTE YOUR SECURE GOOGLE DEVELOPER CREDS IN THESE HOOK SPACES BEFORE COMMITTING TO GITHUB.
+           You generate these on the console.cloud.google.com manager platform dashboard.
+        */
+        const CLIENT_ID = '252576845660-2emekh649a4bnc30n24gveos7pmgvqj6.apps.googleusercontent.com ';
+        const API_KEY = 'AIzaSyAyxyZiktcH4KHlAPmE1ksL_DOgZpr-Yu4';
+        
+        // Target scope properties mapping to execute directory writing and storage functions
+        const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets';
+        const DISCOVERY_DOCS = [
+            'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest',
+            'https://www.googleapis.com/discovery/v1/apis/spreadsheets/v4/rest'
+        ];
+
+        let tokenClient;
+        let gapiInited = false;
+        let gisInited = false;
+        
+        let appState = {
+            previousSheets: [],
+            activeSpreadsheetId: null,
+            activeSheetTitle: '',
+            activeShotsData: []
+        };
+
+        // Bootstrap loader configurations
+        window.onload = function() {
+            gapi.load('client', initializeGapiClient);
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: SCOPES,
+                callback: '', // defined dynamically during authentication execution lifecycle
+            });
+            gisInited = true;
+            checkAuthGates();
+        };
+
+        async function initializeGapiClient() {
+            await gapi.client.init({
+                apiKey: API_KEY,
+                discoveryDocs: DISCOVERY_DOCS,
+            });
+            gapiInited = true;
+            checkAuthGates();
+        }
+
+        function checkAuthGates() {
+            if (gapiInited && gisInited) {
+                const savedToken = localStorage.getItem('g_auth_token');
+                if (savedToken) {
+                    gapi.client.setToken(JSON.parse(savedToken));
+                    document.getElementById('auth-overlay').classList.add('opacity-0', 'pointer-events-none');
+                    loadHistoricalSheetsDirectory();
+                }
+            }
+        }
+
+        function handleAuthClick() {
+            tokenClient.callback = async (resp) => {
+                if (resp.error !== undefined) throw (resp);
+                localStorage.setItem('g_auth_token', JSON.stringify(gapi.client.getToken()));
+                document.getElementById('auth-overlay').classList.add('opacity-0', 'pointer-events-none');
+                loadHistoricalSheetsDirectory();
+            };
+
+            if (gapi.client.getToken() === null) {
+                tokenClient.requestAccessToken({prompt: 'consent'});
+            } else {
+                tokenClient.requestAccessToken({prompt: ''});
+            }
+        }
+
+        function handleSignoutClick() {
+            const token = gapi.client.getToken();
+            if (token !== null) {
+                google.accounts.oauth2.revoke(token.access_token);
+                gapi.client.setToken(null);
+                localStorage.removeItem('g_auth_token');
+                document.getElementById('auth-overlay').classList.remove('opacity-0', 'pointer-events-none');
+            }
+        }
+
+        // FETCH DIRECTORY LOGICAL WORKFLOW HOOKS
+        async function loadHistoricalSheetsDirectory() {
+            try {
+                const response = await gapi.client.drive.files.list({
+                    q: "mimeType='application/vnd.google-apps.spreadsheet' and trashed=false",
+                    fields: 'files(id, name)',
+                    pageSize: 50
+                });
+                appState.previousSheets = response.result.files || [];
+                renderSidebarMenu();
+            } catch (err) {
+                console.error("Directory context extraction pipeline breakdown: ", err);
+            }
+        }
+
+        function renderSidebarMenu() {
+            const listContainer = document.getElementById('sheets-list');
+            listContainer.innerHTML = '';
+
+            if (appState.previousSheets.length === 0) {
+                listContainer.innerHTML = `<div class="text-xs text-zinc-600 italic p-2">No sheets recognized in Workspace.</div>`;
+                return;
+            }
+
+            appState.previousSheets.forEach(sheet => {
+                const button = document.createElement('button');
+                button.className = `w-full text-left px-3 py-2 text-xs rounded transition-colors truncate block ${appState.activeSpreadsheetId === sheet.id ? 'bg-amber-500 text-zinc-950 font-semibold' : 'text-zinc-400 hover:bg-zinc-800/60'}`;
+                button.innerText = `🎬 ${sheet.name}`;
+                button.onclick = () => selectActiveSheet(sheet.id, sheet.name);
+                listContainer.appendChild(button);
+            });
+        }
+
+        // CREATE NEW SHEET INTERFACE ENGINE
+        async function createNewCloudSheet() {
+            const inputField = document.getElementById('new-sheet-input');
+            const titleText = inputField.value.trim();
+            if (!titleText) return;
+
+            try {
+                // Initialize clean spreadsheet configuration via sheet service engine
+                const spreadsheetProperties = {
+                    properties: { title: titleText },
+                    sheets: [{ properties: { title: 'Shotlist', gridProperties: { rowCount: 100, columnCount: 3 } } }]
+                };
+
+                const response = await gapi.client.sheets.spreadsheets.create({}, spreadsheetProperties);
+                const newSpreadsheetId = response.result.spreadsheetId;
+
+                // Append foundational framework header matrix layout schema to index 1 row arrays
+                const headers = [['Status', 'Shot Description', 'Location Setup Profile']];
+                await gapi.client.sheets.spreadsheets.values.update({
+                    spreadsheetId: newSpreadsheetId,
+                    range: 'Shotlist!A1:C1',
+                    valueInputOption: 'RAW',
+                    resource: { values: headers }
+                });
+
+                inputField.value = '';
+                await loadHistoricalSheetsDirectory();
+                selectActiveSheet(newSpreadsheetId, titleText);
+            } catch (err) {
+                console.error("Critical spreadsheet deployment runtime exception: ", err);
+            }
+        }
+
+        async function selectActiveSheet(spreadsheetId, title) {
+            appState.activeSpreadsheetId = spreadsheetId;
+            appState.activeSheetTitle = title;
+            renderSidebarMenu(); // Refresh highlight active item position
+            await syncShotlistRowsFromCloud();
+        }
+
+        // ROW EXTRAPOLATION AND CHECKBOX TOGGLE WORKFLOW ENGINES
+        async function syncShotlistRowsFromCloud() {
+            if (!appState.activeSpreadsheetId) return;
+            
+            try {
+                const response = await gapi.client.sheets.spreadsheets.values.get({
+                    spreadsheetId: appState.activeSpreadsheetId,
+                    range: 'Shotlist!A2:C100',
+                });
+
+                const rawRows = response.result.values || [];
+                appState.activeShotsData = rawRows.map((row, index) => ({
+                    rowIndex: index + 2, // Excel configuration references index offset balance mapping from line 2
+                    isCompleted: row[0] === 'DONE',
+                    description: row[1] || '',
+                    location: row[2] || ''
+                }));
+
+                renderActiveWorkspaceView();
+            } catch (err) {
+                console.error("Cloud tracking row extraction block exception: ", err);
+            }
+        }
+
+        function renderActiveWorkspaceView() {
+            document.getElementById('empty-state').classList.add('hidden');
+            const container = document.getElementById('active-sheet-container');
+            container.classList.remove('hidden');
+
+            document.getElementById('active-sheet-title').innerText = appState.activeSheetTitle;
+            document.getElementById('open-gspreadsheet').href = `https://docs.google.com/spreadsheets/d/${appState.activeSpreadsheetId}/edit`;
+
+            const tbody = document.getElementById('shots-tbody');
+            tbody.innerHTML = '';
+
+            if (appState.activeShotsData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="py-8 text-center text-sm text-zinc-600 italic">No structured shot list arrays documented to this worksheet space.</td></tr>`;
+            } else {
+                appState.activeShotsData.forEach(shot => {
+                    const tr = document.createElement('tr');
+                    tr.className = `transition-colors border-b border-zinc-800/40 ${shot.isCompleted ? 'bg-zinc-950/40 opacity-40' : 'hover:bg-zinc-800/20'}`;
+                    tr.innerHTML = `
+                        <td class="py-4 px-4 text-center">
+                            <input type="checkbox" ${shot.isCompleted ? 'checked' : ''} onchange="toggleCloudShotCheckbox(${shot.rowIndex}, ${shot.isCompleted})" class="w-5 h-5 rounded border-zinc-700 bg-zinc-800 text-amber-500 focus:ring-amber-500 focus:ring-offset-zinc-950" />
+                        </td>
+                        <td class="py-4 px-4 font-medium text-sm ${shot.isCompleted ? 'line-through text-zinc-500' : 'text-zinc-200'}">
+                            ${shot.description}
+                        </td>
+                        <td class="py-4 px-4 text-zinc-400 text-xs font-mono">
+                            ${shot.location || '—'}
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            const checkedCount = appState.activeShotsData.filter(s => s.isCompleted).length;
+            document.getElementById('sheet-counter').innerText = `${checkedCount} / ${appState.activeShotsData.length} SHOTS DONE`;
+        }
+
+        async function addShotRow() {
+            if (!appState.activeSpreadsheetId) return;
+            const descInput = document.getElementById('new-shot-desc');
+            const locInput = document.getElementById('new-shot-loc');
+
+            const desc = descInput.value.trim();
+            const loc = locInput.value.trim();
+            if (!desc) return;
+
+            try {
+                await gapi.client.sheets.spreadsheets.values.append({
+                    spreadsheetId: appState.activeSpreadsheetId,
+                    range: 'Shotlist!A2:C2',
+                    valueInputOption: 'RAW',
+                    insertDataOption: 'INSERT_ROWS',
+                    resource: { values: [['TODO', desc, loc]] }
+                });
+
+                descInput.value = '';
+                locInput.value = '';
+                await syncShotlistRowsFromCloud();
+            } catch (err) {
+                console.error("Row block configuration injection failure exception: ", err);
+            }
+        }
+
+        async function toggleCloudShotCheckbox(rowIndex, currentStatus) {
+            if (!appState.activeSpreadsheetId) return;
+            const updatedValue = currentStatus ? 'TODO' : 'DONE';
+
+            try {
+                await gapi.client.sheets.spreadsheets.values.update({
+                    spreadsheetId: appState.activeSpreadsheetId,
+                    range: `Shotlist!A${rowIndex}`,
+                    valueInputOption: 'RAW',
+                    resource: { values: [[updatedValue]] }
+                });
+                await syncShotlistRowsFromCloud();
+            } catch (err) {
+                console.error("Checkbox state writing update event matrix pipeline failure: ", err);
+            }
+        }
+    </script>
+</body>
+</html>
