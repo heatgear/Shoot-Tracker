@@ -179,20 +179,23 @@
                     throw (resp);
                 }
                 
-                // CRUCIAL FIX: Pass the fresh token directly to GAPI before doing anything else
+                // 1. Pass the fresh token directly to GAPI
                 gapi.client.setToken(resp);
                 
-                // Store it safely for page refreshes
+                // 2. Store it safely for page refreshes
                 localStorage.setItem('g_auth_token', JSON.stringify(resp));
                 
-                // BULLETPROOF FIX: Use 'hidden' to physically drop the overlay element completely
+                // FIX: Drop the overlay IMMEDIATELY so the screen is never stuck
                 document.getElementById('auth-overlay').classList.add('hidden');
                 
-                // Load your project directory mapping
-                await loadHistoricalSheetsDirectory();
+                // 3. Try to load past sheets, but don't let a Google API delay freeze the app
+                try {
+                    await loadHistoricalSheetsDirectory();
+                } catch (directoryError) {
+                    console.warn("Drive API is still warming up on Google's servers:", directoryError);
+                }
             };
 
-            // Trigger the Google popup window frame
             if (gapi.client.getToken() === null) {
                 tokenClient.requestAccessToken({prompt: 'consent'});
             } else {
