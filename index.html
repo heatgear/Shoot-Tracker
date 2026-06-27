@@ -118,9 +118,10 @@
         
         // Target scope properties mapping to execute directory writing and storage functions
         const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets';
+        // FIX: Changed 'spreadsheets' to 'sheets' to fix the 404 API error
         const DISCOVERY_DOCS = [
             'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest',
-            'https://www.googleapis.com/discovery/v1/apis/spreadsheets/v4/rest'
+            'https://www.googleapis.com/discovery/v1/apis/sheets/v4/rest'
         ];
 
         let tokenClient;
@@ -140,19 +141,23 @@
             tokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: CLIENT_ID,
                 scope: SCOPES,
-                callback: '', // defined dynamically during authentication execution lifecycle
+                callback: '', 
             });
             gisInited = true;
             checkAuthGates();
         };
 
         async function initializeGapiClient() {
-            await gapi.client.init({
-                apiKey: API_KEY,
-                discoveryDocs: DISCOVERY_DOCS,
-            });
-            gapiInited = true;
-            checkAuthGates();
+            try {
+                await gapi.client.init({
+                    apiKey: API_KEY,
+                    discoveryDocs: DISCOVERY_DOCS,
+                });
+                gapiInited = true;
+                checkAuthGates();
+            } catch (initError) {
+                console.error("GAPI initialization failed:", initError);
+            }
         }
 
         function checkAuthGates() {
@@ -161,11 +166,9 @@
                 if (savedToken) {
                     try {
                         gapi.client.setToken(JSON.parse(savedToken));
-                        // Force the overlay away immediately if already authenticated
                         document.getElementById('auth-overlay').classList.add('hidden');
-                        loadHistoricalSheetsDirectory();
+                        loadHistoricalSheetsDirectory().catch(err => console.warn(err));
                     } catch (e) {
-                        console.error("Token restoration failed, clearing cache:", e);
                         localStorage.removeItem('g_auth_token');
                     }
                 }
